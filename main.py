@@ -59,17 +59,21 @@ def start(update: Update, context):
 def timeset(update: Update, context):
     global interval_seconds
     try:
-        new_time = int(context.args[0])  # args enabled via pass_args=True
-        interval_seconds = new_time
-        scheduler.reschedule_job('send_signal', trigger='interval', seconds=interval_seconds)
-        update.message.reply_text(f"✅ Signal interval updated to {interval_seconds} seconds.")
+        parts = update.message.text.strip().split()
+        if len(parts) >= 2:
+            new_time = int(parts[1])
+            interval_seconds = new_time
+            scheduler.reschedule_job('send_signal', trigger='interval', seconds=interval_seconds)
+            update.message.reply_text(f"✅ Signal interval updated to {interval_seconds} seconds.")
+        else:
+            raise ValueError
     except Exception:
         update.message.reply_text("❌ Invalid format. Use: /timeset 120")
 
 # --- Webhook Route ---
 dispatcher = Dispatcher(bot=bot, update_queue=None, workers=4, use_context=True)
 dispatcher.add_handler(CommandHandler("start", start))
-dispatcher.add_handler(CommandHandler("timeset", timeset, pass_args=True))  # ✅ pass_args added
+dispatcher.add_handler(CommandHandler("timeset", timeset))  # ✅ pass_args removed
 
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
