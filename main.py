@@ -1,60 +1,71 @@
 import os
-import random
+import time
+import threading
 import logging
 from flask import Flask, request
 from telegram import Bot, Update
 from telegram.ext import Dispatcher, CommandHandler
-from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 from pytz import timezone
 
 # --- Configurations ---
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GROUP_ID = int(os.getenv("GROUP_ID"))
-DEFAULT_INTERVAL = int(os.getenv("DEFAULT_INTERVAL", 300))
+DEFAULT_INTERVAL = int(os.getenv("DEFAULT_INTERVAL", 300))  # default 5 mins
 TIMEZONE = timezone('Asia/Dhaka')
 
 bot = Bot(token=BOT_TOKEN)
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# --- Scheduler Setup ---
-scheduler = BackgroundScheduler()
-interval_seconds = DEFAULT_INTERVAL
+dispatcher = Dispatcher(bot=bot, update_queue=None, workers=4, use_context=True)
 
-# --- Signal Generator ---
+# --- Signal Message Generator ---
 assets = ['EUR/USD', 'BTC/USD', 'GBP/USD', 'USD/JPY']
 directions = ['UP', 'DOWN']
+interval_seconds = DEFAULT_INTERVAL
+interval_lock = threading.Lock()
+interval_updated = threading.Event()
+interval_updated.set()
 
-def send_signal():
-    asset = random.choice(assets)
-    direction = random.choice(directions)
-    now = datetime.now(TIMEZONE).strftime('%I:%M %p')
+def send_signal_loop():
+    while True:
+        try:
+            asset = random.choice(assets)
+            direction = random.choice(directions)
+            now = datetime.now(TIMEZONE).strftime('%I:%M %p')
 
-    message = (
-        "🚨 Trade Signal Alert\n\n"
-        f"Pair: {asset}\n"
-        f"Direction: {'📈' if direction == 'UP' else '📉'} {direction}\n"
-        f"Time: {now}\n"
-        "Duration: 1 Minute\n\n"
-        "⚠️ Place this trade manually on Quotex!"
-    )
-    bot.send_message(chat_id=GROUP_ID, text=message)
+            message = (
+                "🚨 *Trade Signal Alert*\n\n"
+                f"💹 Pair: `{asset}`\n"
+                f"📊 Direction: {'📈' if direction == 'UP' else '📉'} *{direction}*\n"
+                f"🕒 Time: {now}\n"
+                f"⏱ Duration: 1 Minute\n\n"
+                "⚠️ Place this trade manually on *Quotex!*"
+            )
 
-# ✅ Fix: timezone required for apscheduler 3.6.3
-job = scheduler.add_job(send_signal, 'interval', seconds=interval_seconds, id='send_signal', timezone=TIMEZONE)
-scheduler.start()
+            bot.send_message(chat_id=GROUP_ID, text=message, parse_mode='Markdown')
+            logger.info(f"Signal sent: {message}")
 
-# --- Handlers ---
+        except Exception as e:
+            logger.error(f"Error sending signal: {e}")
+
+        with interval_lock:
+            wait = interval_seconds
+        interval_updated.wait(timeout=wait)
+        interval_updated.clear()
+
+# --- Commands ---
 def start(update: Update, context):
-    welcome = (
+    msg = (
         "🌟 *Welcome to Elite Quotex Signal Bot!*\n\n"
         "This bot sends 1-minute trading signals every 5 minutes by default.\n"
         "You can change the interval using `/timeset <seconds>`.\n\n"
-        "Example: `/timeset 120` to receive signals every 2 minutes.\n\n"
+        "Example: `/timeset 120`\n\n"
         "✅ All signals are posted automatically in the group."
     )
-    update.message.reply_text(welcome, parse_mode='Markdown')
+    update.message.reply_text(msg, parse_mode='Markdown')
 
 def timeset(update: Update, context):
     global interval_seconds
@@ -62,28 +73,35 @@ def timeset(update: Update, context):
         parts = update.message.text.strip().split()
         if len(parts) >= 2:
             new_time = int(parts[1])
-            interval_seconds = new_time
-            scheduler.reschedule_job('send_signal', trigger='interval', seconds=interval_seconds)
-            update.message.reply_text(f"✅ Signal interval updated to {interval_seconds} seconds.")
+            with interval_lock:
+                interval_seconds = new_time
+            interval_updated.set()
+            update.message.reply_text(f"✅ Signal interval updated to {new_time} seconds.")
+            logger.info(f"Interval changed to {new_time} seconds")
         else:
             raise ValueError
     except Exception:
         update.message.reply_text("❌ Invalid format. Use: /timeset 120")
 
-# --- Webhook Route ---
-dispatcher = Dispatcher(bot=bot, update_queue=None, workers=4, use_context=True)
+# --- Webhook Setup ---
 dispatcher.add_handler(CommandHandler("start", start))
-dispatcher.add_handler(CommandHandler("timeset", timeset))  # ✅ pass_args removed
+dispatcher.add_handler(CommandHandler("timeset", timeset))
 
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), bot)
     dispatcher.process_update(update)
-    return "OK"
+    return "OK", 200
 
-@app.route("/")
-def index():
-    return "Elite Quotex Signal Bot is running."
+@app.route("/", methods=["GET"])
+def home():
+    return "Elite Quotex Signal Bot is running.", 200
 
+# --- Start signal thread ---
+threading.Thread(target=send_signal_loop, daemon=True).start()
+
+# --- Start Flask App ---
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=8080)
+    PORT = int(os.getenv("PORT", 8080))
+    logger.info("Starting Elite Quotex Bot server...")
+    app.run(host="0.0.0.0", port=PORT)
