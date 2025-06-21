@@ -19,11 +19,11 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
 # --- Scheduler Setup ---
-scheduler = BackgroundScheduler(timezone=TIMEZONE)  # ✅ Fixed timezone issue
+scheduler = BackgroundScheduler(timezone=TIMEZONE)
 interval_seconds = DEFAULT_INTERVAL
 
 # --- Signal Generator ---
-assets = ['EUR/USD', 'BTC/USD', 'GBP/USD', 'USD/JPY']
+assets = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD']
 directions = ['UP', 'DOWN']
 
 def send_signal():
@@ -32,14 +32,14 @@ def send_signal():
     now = datetime.now(TIMEZONE).strftime('%I:%M %p')
 
     message = (
-        "🚨 Trade Signal Alert\n\n"
-        f"Pair: {asset}\n"
+        "🚨 *Trade Signal Alert*\n\n"
+        f"Pair: `{asset}`\n"
         f"Direction: {'📈' if direction == 'UP' else '📉'} {direction}\n"
         f"Time: {now}\n"
         "Duration: 1 Minute\n\n"
         "⚠️ Place this trade manually on Quotex!"
     )
-    bot.send_message(chat_id=GROUP_ID, text=message)
+    bot.send_message(chat_id=GROUP_ID, text=message, parse_mode="Markdown")
 
 job = scheduler.add_job(send_signal, 'interval', seconds=interval_seconds, id='send_signal')
 scheduler.start()
@@ -61,24 +61,27 @@ def timeset(update: Update, context):
         new_time = int(context.args[0])
         interval_seconds = new_time
         scheduler.reschedule_job('send_signal', trigger='interval', seconds=interval_seconds)
-        update.message.reply_text(f"Signal interval updated to {interval_seconds} seconds ✅")
+        update.message.reply_text(f"✅ Signal interval updated to {interval_seconds} seconds.")
     except Exception:
-        update.message.reply_text("Invalid format. Use: /timeset 120")
+        update.message.reply_text("❌ Invalid format. Use: /timeset 120")
 
-# --- Webhook Route ---
+# --- Dispatcher Setup ---
 dispatcher = Dispatcher(bot=bot, update_queue=None, workers=4, use_context=True)
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CommandHandler("timeset", timeset))
 
+# --- Webhook route ---
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), bot)
     dispatcher.process_update(update)
-    return "OK"
+    return "OK", 200
 
-@app.route("/")
+# --- Root for GET requests (optional health check) ---
+@app.route("/", methods=["GET"])
 def index():
-    return "Elite Quotex Signal Bot is running."
+    return "✅ Elite Quotex Signal Bot is running."
 
+# --- Local testing (if needed) ---
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080)
