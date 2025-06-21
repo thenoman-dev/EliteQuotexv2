@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 dispatcher = Dispatcher(bot=bot, update_queue=None, workers=4, use_context=True)
 
 # --- Signal Message Generator ---
-assets = ['EUR/USD', 'CHF/USD', 'NZD/USD', 'CAD/USD', 'AUD/USD', 'GBP/USD', 'USD/JPY']
+assets = ['EUR/USD', 'AUD/USD', 'GBP/USD', 'USD/JPY']
 directions = ['UP', 'DOWN']
 interval_seconds = DEFAULT_INTERVAL
 interval_lock = threading.Lock()
