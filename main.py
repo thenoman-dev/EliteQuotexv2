@@ -19,7 +19,7 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
 # --- Scheduler Setup ---
-scheduler = BackgroundScheduler()
+scheduler = BackgroundScheduler(timezone=TIMEZONE)  # ✅ Fixed timezone issue
 interval_seconds = DEFAULT_INTERVAL
 
 # --- Signal Generator ---
