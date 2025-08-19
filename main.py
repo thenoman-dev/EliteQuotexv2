@@ -3,7 +3,7 @@ import random
 import logging
 from flask import Flask, request
 from telegram import Bot, Update
-from telegram.ext import Dispatcher, CommandHandler
+from telegram.ext import Dispatcher, CommandHandler, CallbackContext
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 from pytz import timezone
@@ -45,7 +45,7 @@ job = scheduler.add_job(send_signal, 'interval', seconds=interval_seconds, id='s
 scheduler.start()
 
 # --- Handlers ---
-def start(update: Update, context):
+def start(update: Update, context: CallbackContext):
     welcome = (
         "🌟 *Welcome to Elite Quotex Signal Bot!*\n\n"
         "This bot sends 1-minute trading signals every 5 minutes by default.\n"
@@ -56,7 +56,7 @@ def start(update: Update, context):
     update.message.reply_text(welcome, parse_mode='Markdown')
 
 
-def help_command(update: Update, context):
+def help_command(update: Update, context: CallbackContext):
     help_text = (
         "ℹ️ *Available Commands:*\n\n"
         "/start - Welcome message\n"
@@ -67,7 +67,7 @@ def help_command(update: Update, context):
     update.message.reply_text(help_text, parse_mode='Markdown')
 
 
-def about(update: Update, context):
+def about(update: Update, context: CallbackContext):
     about_text = (
         "ℹ️ *About Elite Quotex Signal Bot*\n\n"
         "🔹 Developer: @thenoman_dev\n"
@@ -79,7 +79,7 @@ def about(update: Update, context):
     update.message.reply_text(about_text, parse_mode='Markdown')
 
 
-def timeset(update: Update, context):
+def timeset(update: Update, context: CallbackContext):
     global interval_seconds
     try:
         user_id = update.effective_user.id
