@@ -70,7 +70,7 @@ def help_command(update: Update, context: CallbackContext):
 def about(update: Update, context: CallbackContext):
     about_text = (
         "ℹ️ *About Elite Quotex Signal Bot*\n\n"
-        "🔹 Developer: @thenoman_dev\n"
+        "🔹 Developer: @nknoman22\n"
         "🔹 Purpose: Provides automated Quotex trading signals\n"
         "🔹 Default Interval: 5 minutes (customizable with /timeset)\n\n"
         "⚠️ Disclaimer: Signals are for educational purposes only. "
